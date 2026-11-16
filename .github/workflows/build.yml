@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # 1. 拉取代码
+      # 1. 拉取你本项目的代码
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 安装编译工具链
+      # 2. 安装必要的编译工具
       - name: Install Build Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake wget unzip ninja-build
+          sudo apt-get install -y build-essential cmake ninja-build
 
-      # 3. 下载并解压 Android NDK r25c (解压到主目录)
+      # 3. 下载并配置 Android NDK r25c
       - name: Setup Android NDK r25c
         run: |
           set -e
@@ -32,22 +32,18 @@ jobs:
           echo "Unzipping NDK..."
           unzip -q /tmp/ndk-r25c.zip -d ~/
           
-          # 写入全局环境变量，并转换为绝对路径
+          # 获取绝对路径并写入全局环境变量
           export NDK_REAL_PATH=$(realpath ~/android-ndk-r25c)
           echo "NDK_PATH=${NDK_REAL_PATH}" >> $GITHUB_ENV
           echo "NDK installed at: $NDK_REAL_PATH"
 
-      # 4. 下载并解压 tinyalsa 源码 (修复重定向问题)
-      - name: Download tinyalsa source
+      # 4. 【核心修复】使用 Git 直接拉取 tinyalsa v1.2.0 源码
+      - name: Download tinyalsa source via Git
         run: |
           set -e
-          echo "Downloading tinyalsa..."
-          # 使用 GitHub 官方的稳定下载通道，并强制追踪重定向
-          curl -L --retry 3 -o tinyalsa-1.2.0.tar.gz \
-            https://codeload.github.com/tinyalsa/tinyalsa/tar.gz/refs/tags/1.2.0
-          
-          mkdir -p tinyalsa
-          tar -xf tinyalsa-1.2.0.tar.gz --strip-components=1 -C tinyalsa
+          echo "Cloning tinyalsa v1.2.0..."
+          # 深度克隆到 v1.2.0 标签，并放到 tinyalsa 目录
+          git clone --depth 1 -b 1.2.0 https://github.com/tinyalsa/tinyalsa.git tinyalsa
           echo "tinyalsa source is ready."
 
       # 5. 使用 Ninja 进行交叉编译
@@ -57,7 +53,7 @@ jobs:
           cd tinyalsa
           mkdir -p build && cd build
           
-          echo "Starting CMake build..."
+          echo "Starting CMake build with NDK..."
           
           cmake -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=${{ env.NDK_PATH }}/build/cmake/android.toolchain.cmake \
@@ -65,14 +61,6 @@ jobs:
             -DANDROID_PLATFORM=android-24 \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
-            -DTINYALSA_BUILD_EXAMPLES=ON \
             ..
           
-          ninja -j$(nproc)
-          echo "Build completed successfully!"
-
-      # 6. 上传编译好的二进制文件
-      - name: Upload binaries
-        uses: actions/upload-artifact@v4
-        with:
-          name: tinyalsa-arm6
+          ninja -j
