@@ -33,4 +33,46 @@ jobs:
           unzip -q /tmp/ndk-r25c.zip -d ~/
           
           # 获取绝对路径并写入全局环境变量
-          export
+          export NDK_REAL_PATH=$(realpath ~/android-ndk-r25c)
+          echo "NDK_PATH=${NDK_REAL_PATH}" >> $GITHUB_ENV
+          echo "NDK installed at: $NDK_REAL_PATH"
+
+      # 4. 使用正确的 Tag 名拉取 tinyalsa v1.2.0 源码
+      - name: Download tinyalsa source via Git
+        run: |
+          set -e
+          echo "Cloning tinyalsa v1.2.0..."
+          git clone --depth 1 -b v1.2.0 https://github.com/tinyalsa/tinyalsa.git tinyalsa
+          echo "tinyalsa source is ready."
+
+      # 5. 使用 Ninja 进行交叉编译 (增加 TINYALSA_BUILD_EXAMPLES=ON)
+      - name: CMake & Build
+        run: |
+          set -e
+          cd tinyalsa
+          mkdir -p build && cd build
+          
+          echo "Starting CMake build with NDK..."
+          
+          cmake -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=${{ env.NDK_PATH }}/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DTINYALSA_BUILD_EXAMPLES=ON \
+            ..
+          
+          ninja -j$(nproc)
+          echo "Build completed successfully!"
+
+      # 6. 打包并上传编译产物
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinyalsa-arm64-api24-static
+          path: |
+            tinyalsa/build/tinymix
+            tinyalsa/build/tinyplay
+            tinyalsa/build/tinycap
+            tinyalsa/build/tinypcminfo
