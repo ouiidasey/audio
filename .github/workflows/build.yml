@@ -1,40 +1,35 @@
-name: Build tinyalsa
-
+name: build tinyalsa
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
-      # 1. 绝对使用官方最新稳定版 v4，彻底解决 128 错误
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. 绝对使用官方最新版 v1，自动下载 NDK
-      - name: Setup NDK
+      - name: Setup NDK r25c
         id: ndk
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25c
           local-cache: true
 
-      # 3. 下载并解压 tinyalsa 源码
-      - name: Download tinyalsa
+      - name: Download tinyalsa 1.2.0
         run: |
           set -e
-          curl -L --retry 3 -o tinyalsa-1.2.0.tar.gz \
-            https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz
-          mkdir -p tinyalsa
-          tar -xf tinyalsa-1.2.0.tar.gz --strip-components=1 -C tinyalsa
+          wget --retry-connrefused --waitretry=3 --tries=3 \
+          https://mirror.ghproxy.com/https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz \
+          -O tinyalsa-1.2.0.tar.gz
+          ls -la
+          tar -xf tinyalsa-1.2.0.tar.gz
+          mv tinyalsa-1.2.0 tinyalsa
+          ls -la tinyalsa
 
-      # 4. CMake 交叉编译
-      - name: CMake & Build
+      - name: CMake & Build static bin
         run: |
-          set -e
           cd tinyalsa
           mkdir -p build && cd build
           cmake -DCMAKE_TOOLCHAIN_FILE=${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
@@ -46,7 +41,6 @@ jobs:
             ..
           make -j$(nproc)
 
-      # 5. 上传编译产物
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
