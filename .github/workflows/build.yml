@@ -10,56 +10,80 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # 1. 彻底跳过 git clone，直接使用虚拟机已拉取的默认代码
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # 2. 直接使用 ubuntu-22.04 虚拟机自带的 Android NDK (r25b)
-      - name: Setup NDK
-        id: ndk
+      # 1. 彻底放弃 checkout 插件。用原生命令拉取代码，并进入工作目录
+      - name: Native Git Clone
         run: |
-          # ubuntu-22.04 默认自带了 NDK r25b
-          # 直接使用系统自带路径即可
-          echo "NDK_PATH=/usr/local/lib/android/sdk/ndk/25.2.9519653" >> $GITHUB_ENV
-          echo "System NDK r25b ready."
+          git config --global init.defaultBranch main
+          git init
+          git remote add origin https://github.com/oulidasey/audio.git
+          git fetch --depth 1 origin main
+          git checkout main
 
-      # 3. 下载 tinyalsa 源码并解压
+      # 2. 放弃 setup-ndk 插件。用 apt-get 和 wget 手动下载 NDK
+      - name: Native NDK Setup
+        run: |
+          echo "=== Step 2: Installing Wget and Unzip ==="
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          
+          echo "=== Step 2: Downloading NDK r25c ==="
+          wget --retry-connrefused --waitretry=3 --tries=3 \
+            https://dl.google.com/android/repository/android-ndk-r25c-linux.zip -O ndk-r25c.zip
+          
+          echo "=== Step 2: Unzipping NDK ==="
+          unzip -q ndk-r25c.zip -d /usr/local/
+          
+          # 写入全局环境变量
+          echo "NDK_PATH=/usr/local/android-ndk-r25c" >> $GITHUB_ENV
+          echo "=== Step 2: NDK Environment Set: $NDK_PATH ==="
+
+      # 3. 原生下载 tinyalsa 源码
       - name: Download tinyalsa source
         run: |
-          set -e
+          echo "=== Step 3: Downloading tinyalsa ==="
           wget --retry-connrefused --waitretry=3 --tries=3 \
-            https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz \
-            -O tinyalsa-1.2.0.tar.gz
+            https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz -O tinyalsa-1.2.0.tar.gz
           
           mkdir -p tinyalsa
           tar -xf tinyalsa-1.2.0.tar.gz --strip-components=1 -C tinyalsa
-          echo "tinyalsa source ready."
+          echo "=== Step 3: tinyalsa downloaded and extracted ==="
 
-      # 4. 使用 CMake 进行交叉编译
+      # 4. 原生 CMake 交叉编译
       - name: CMake & Build
         run: |
-          set -e
+          echo "=== Step 4: Building with NDK ==="
           cd tinyalsa
           mkdir -p build && cd build
           
-          echo "Starting CMake build with system NDK: $NDK_PATH"
-          cmake -DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake \
+          cmake -DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-24 \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DTINYALSA_BUILD_EXAMPLES=ON \
             ..
-          
+            
           make -j$(nproc)
+          echo "=== Step 4: Build Finished ==="
 
-      # 5. 上传编译好的二进制文件
-      - name: Upload binaries
-        uses: actions/upload-artifact@v4
-        with:
-          name: tinyalsa-arm64-api24-static
-          path: |
-            tinyalsa/build/tinymix
-            tinyalsa/build/tinyplay
-            tinyalsa/build/tinycap
-            tinyalsa/build/tinypcminfo
+      # 5. 彻底放弃 upload-artifact 插件。用原生 zip 和 mv 命令打包
+      - name: Upload binaries natively
+        run: |
+          echo "=== Step 5: Packing artifacts ==="
+          # 在根目录创建一个专门用来存放产物的文件夹
+          mkdir -p /tmp/artifacts
+          
+          # 把编译好的二进制文件复制过去
+          cp tinyalsa/build/tinymix /tmp/artifacts/
+          cp tinyalsa/build/tinyplay /tmp/artifacts/
+          cp tinyalsa/build/tinycap /tmp/artifacts/
+          cp tinyalsa/build/tinypcminfo /tmp/artifacts/
+          
+          # 打包成 zip，方便查看和下载
+          zip -r tinyalsa-arm64-api24-static.zip /tmp/artifacts
+          
+          # 把压缩包移到 GitHub 自动识别的 artifacts 目录
+          # 如果该目录不存在则创建它
+          mkdir -p ${{ github.workspace }}/artifacts
+          mv tinyalsa-arm64-api24-static.zip ${{ github.workspace }}/artifacts/
+          echo "=== Step 5: Artifacts packed successfully ==="
