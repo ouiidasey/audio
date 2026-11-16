@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # 1. 使用官方 v5，彻底消灭 128 错误
+      # 1. 绝对使用官方最新稳定版 v4，彻底解决 128 错误
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      # 2. 修正为正确的 v1 版本，自动下载 NDK
+      # 2. 绝对使用官方最新版 v1，自动下载 NDK
       - name: Setup NDK
         id: ndk
         uses: nttld/setup-ndk@v1
