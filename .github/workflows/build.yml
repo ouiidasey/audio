@@ -45,7 +45,7 @@ jobs:
           git clone --depth 1 https://github.com/tinyalsa/tinyalsa.git tinyalsa
           echo "tinyalsa source is ready."
 
-      # 5. 使用 Ninja 进行交叉编译 (使用最高权限禁用警告)
+      # 5. 使用 Ninja 进行交叉编译 (自动修复源码警告)
       - name: CMake & Build
         run: |
           set -e
@@ -54,7 +54,7 @@ jobs:
           
           echo "Starting CMake build with NDK..."
           
-          # 核心修复：使用 -Wno-all 强制禁用所有警告，绕过 NDK 的强制检查
+          # 使用标准 CMake 参数
           cmake -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=${{ env.NDK_PATH }}/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
@@ -62,8 +62,11 @@ jobs:
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DBUILD_SHARED_LIBS=OFF \
             -DTINYALSA_BUILD_EXAMPLES=ON \
-            -DCMAKE_C_FLAGS="-Wno-all" \
             ..
+          
+          # 【核心修复】在 ninja 编译前，手动给报错的源文件末尾加个空行
+          echo "Patching tinyhostless.c to fix newline warning..."
+          echo "" >> utils/tinyhostless.c
           
           ninja -j$(nproc)
           echo "Build completed successfully!"
