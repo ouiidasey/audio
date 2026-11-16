@@ -9,31 +9,22 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup NDK r25c
         id: ndk
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@v2
         with:
           ndk-version: r25c
           local-cache: true
-
-      # 👇 新增的这一整段（注意开头）
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - name: Download tinyalsa 1.2.0
         run: |
           set -e
           wget --retry-connrefused --waitretry=3 --tries=3 \
-          https://mirror.ghproxy.com/https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.ta \
+          https://mirror.ghproxy.com/https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz \
           -O tinyalsa-1.2.0.tar.gz
-          ls -la
-          tar -xf tinyalsa-1.2.0.tar.gz
-          mv tinyalsa-1.2.0 tinyalsa
-          ls -la tinyalsa
+
       - name: CMake & Build static bin
         run: |
           cd tinyalsa
