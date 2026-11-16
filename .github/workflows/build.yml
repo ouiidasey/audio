@@ -10,67 +10,80 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # 1. 放弃所有 Actions，直接用 Linux 原生 git 命令拉取源码
-      - name: Git Clone (纯原生命令，不受 Node 影响)
+      # 步骤 1: 使用原生 Git 命令拉取你的仓库 (路径锁定为 $GITHUB_WORKSPACE)
+      - name: Native Git Clone
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git clone --branch main --depth 1 https://github.com/oulidasey/audio.git ./workspace
-          # 切换到工作目录
-          echo "workspace" >> $GITHUB_ENV
-
-      # 2. 放弃 checkout 插件，直接用 apt 下载 NDK 并配置环境
-      - name: Setup NDK r25c (纯原生命令)
-        run: |
-          set -e
-          echo "Installing wget..."
-          sudo apt-get update && sudo apt-get install -y wget unzip
+          # 强制在 GitHub 的默认工作目录拉取
+          git clone --branch main --depth 1 https://github.com/oulidasey/audio.git $GITHUB_WORKSPACE
           
-          echo "Downloading NDK r25c..."
-          wget --retry-connrefused --waitretry=3 --tries=3 \
-            https://dl.google.com/android/repository/android-ndk-r25c-linux.zip -O ndk-r25c.zip
-          
-          echo "Unzipping NDK..."
-          unzip -q ndk-r25c.zip -d /usr/local
-          mv /usr/local/android-ndk-r25c /usr/local/ndk
-          
-          # 把 NDK 路径写入全局环境变量
-          echo "NDK_PATH=/usr/local/ndk" >> $GITHUB_ENV
-          echo "NDK installed at: $NDK_PATH"
-
-      # 3. 下载 tinyalsa 源码
+      # 步骤 2: 原生下载并解压 tinyalsa 源码 (路径同样锁定)
       - name: Download tinyalsa source
         run: |
-          cd ${GITHUB_WORKSPACE}
-          curl -L --retry 3 -o tinyalsa-1.2.0.tar.gz \
-            https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz
-          
-          mkdir -p tinyalsa
-          tar -xf tinyalsa-1.2.0.tar.gz --strip-components=1 -C tinyalsa
-          echo "tinyalsa source ready."
+          set -e
+          # 使用 wget 下载
+          wget --retry-connrefused --waitretry=3 --tries=3 \
+            https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz \
+            -O $GITHUB_WORKSPACE/tinyalsa-1.2.0.tar.gz
 
-      # 4. 原生 CMake 交叉编译
+          # 清理旧文件夹 (如果存在)
+          rm -rf $GITHUB_WORKSPACE/tinyalsa
+          
+          mkdir -p $GITHUB_WORKSPACE/tinyalsa
+          # 解压并将文件精准剥离层级，直接放进 $GITHUB_WORKSPACE/tinyalsa 中
+          tar -xf $GITHUB_WORKSPACE/tinyalsa-1.2.0.tar.gz \
+            --strip-components=1 -C $GITHUB_WORKSPACE/tinyalsa
+          
+          echo "Listing tinyalsa source files to verify:"
+          ls $GITHUB_WORKSPACE/tinyalsa/CMakeLists.txt
+
+      # 步骤 3: 原生下载并解压 Android NDK r25c
+      - name: Setup NDK r25c natively
+        run: |
+          set -e
+          sudo apt-get update && sudo apt-get install -y wget unzip
+          
+          wget --retry-connrefused --waitretry=3 --tries=3 \
+            https://dl.google.com/android/repository/android-ndk-r25c-linux.zip \
+            -O /tmp/ndk-r25c.zip
+          
+          unzip -q /tmp/ndk-r25c.zip -d /usr/local/
+          mv /usr/local/android-ndk-r25c /usr/local/ndk
+          
+          # 将 NDK 路径写入全局环境变量，供后续步骤使用
+          echo "NDK_PATH=/usr/local/ndk" >> $GITHUB_ENV
+          echo "NDK setup complete: $NDK_PATH"
+
+      # 步骤 4: 使用 CMake 进行原生交叉编译
       - name: CMake & Build
         run: |
-          cd ${GITHUB_WORKSPACE}/tinyalsa
+          set -e
+          # 进入 tinyalsa 的源码目录
+          cd $GITHUB_WORKSPACE/tinyalsa
+          
+          # 创建并进入构建目录
           mkdir -p build && cd build
           
-          cmake -DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake \
+          echo "Starting CMake build with NDK..."
+          cmake -DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-24 \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DTINYALSA_BUILD_EXAMPLES=ON \
             ..
+          
+          # 编译
           make -j$(nproc)
 
-      # 5. 上传编译好的二进制文件
+      # 步骤 5: 上传生成的二进制文件
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: tinyalsa-arm64-api24-static
           path: |
-            tinyalsa/build/tinymix
-            tinyalsa/build/tinyplay
-            tinyalsa/build/tinycap
-            tinyalsa/build/tinypcminfo
+            $GITHUB_WORKSPACE/tinyalsa/build/tinymix
+            $GITHUB_WORKSPACE/tinyalsa/build/tinyplay
+            $GITHUB_WORKSPACE/tinyalsa/build/tinycap
+            $GITHUB_WORKSPACE/tinyalsa/build/tinypcminfo
