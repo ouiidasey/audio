@@ -10,36 +10,52 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Setup Node.js 20 (兼容 checkout action)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      # 1. 放弃所有 Actions，直接用 Linux 原生 git 命令拉取源码
+      - name: Git Clone (纯原生命令，不受 Node 影响)
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git clone --branch main --depth 1 https://github.com/oulidasey/audio.git ./workspace
+          # 切换到工作目录
+          echo "workspace" >> $GITHUB_ENV
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup NDK r25c
-        id: ndk
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r25c
-          local-cache: true
-
-      - name: Download tinyalsa source
+      # 2. 放弃 checkout 插件，直接用 apt 下载 NDK 并配置环境
+      - name: Setup NDK r25c (纯原生命令)
         run: |
           set -e
+          echo "Installing wget..."
+          sudo apt-get update && sudo apt-get install -y wget unzip
+          
+          echo "Downloading NDK r25c..."
+          wget --retry-connrefused --waitretry=3 --tries=3 \
+            https://dl.google.com/android/repository/android-ndk-r25c-linux.zip -O ndk-r25c.zip
+          
+          echo "Unzipping NDK..."
+          unzip -q ndk-r25c.zip -d /usr/local
+          mv /usr/local/android-ndk-r25c /usr/local/ndk
+          
+          # 把 NDK 路径写入全局环境变量
+          echo "NDK_PATH=/usr/local/ndk" >> $GITHUB_ENV
+          echo "NDK installed at: $NDK_PATH"
+
+      # 3. 下载 tinyalsa 源码
+      - name: Download tinyalsa source
+        run: |
+          cd ${GITHUB_WORKSPACE}
           curl -L --retry 3 -o tinyalsa-1.2.0.tar.gz \
             https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz
           
           mkdir -p tinyalsa
           tar -xf tinyalsa-1.2.0.tar.gz --strip-components=1 -C tinyalsa
+          echo "tinyalsa source ready."
 
+      # 4. 原生 CMake 交叉编译
       - name: CMake & Build
         run: |
-          cd tinyalsa
+          cd ${GITHUB_WORKSPACE}/tinyalsa
           mkdir -p build && cd build
           
-          cmake -DCMAKE_TOOLCHAIN_FILE=${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
+          cmake -DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-24 \
             -DCMAKE_BUILD_TYPE=Release \
@@ -48,6 +64,7 @@ jobs:
             ..
           make -j$(nproc)
 
+      # 5. 上传编译好的二进制文件
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
