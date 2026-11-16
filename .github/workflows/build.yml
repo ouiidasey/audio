@@ -33,27 +33,4 @@ jobs:
           unzip -q /tmp/ndk-r25c.zip -d ~/
           
           # 获取绝对路径并写入全局环境变量
-          export NDK_REAL_PATH=$(realpath ~/android-ndk-r25c)
-          echo "NDK_PATH=${NDK_REAL_PATH}" >> $GITHUB_ENV
-          echo "NDK installed at: $NDK_REAL_PATH"
-
-      # 4. 【核心修复】直接使用 Git 标签 (Tag) 克隆 tinyalsa v1.2.0 源码
-      - name: Download tinyalsa source via Git Tag
-        run: |
-          set -e
-          echo "Cloning tinyalsa v1.2.0..."
-          # 使用 Git 的标签功能进行克隆，彻底解决分支名找不到的问题
-          git clone --depth 1 --branch 1.2.0 https://github.com/tinyalsa/tinyalsa.git tinyalsa
-          echo "tinyalsa source is ready."
-
-      # 5. 使用 Ninja 进行交叉编译
-      - name: CMake & Build
-        run: |
-          set -e
-          cd tinyalsa
-          mkdir -p build && cd build
-          
-          echo "Starting CMake build with NDK..."
-          
-          cmake -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE
+          export
