@@ -10,43 +10,63 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # 1. 使用目前绝对最新的 v7，彻底完美兼容 Node 24
+      # 1. 成功拉取代码
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # 2. 使用最新稳定版插件自动配置交叉编译环境
-      - name: Setup NDK
-        id: ndk
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r25c
-          local-cache: true
+      # 2. 关键：安装 Linux 原生编译环境和 CMake
+      - name: Install Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake wget unzip ninja-build
 
-      # 3. 原生下载并解压 tinyalsa 源码
-      - name: Download tinyalsa
+      # 3. 下载并解压 Android NDK r25c
+      - name: Setup Android NDK r25c
+        run: |
+          set -e
+          echo "Downloading NDK..."
+          wget --retry-connrefused --waitretry=3 --tries=3 \
+            https://dl.google.com/android/repository/android-ndk-r25c-linux.zip \
+            -O /tmp/ndk-r25c.zip
+          
+          echo "Unzipping NDK..."
+          unzip -q /tmp/ndk-r25c.zip -d /usr/local/
+          # 写入全局环境变量
+          echo "NDK_PATH=/usr/local/android-ndk-r25c" >> $GITHUB_ENV
+          echo "NDK installed at $NDK_PATH"
+
+      # 4. 下载 tinyalsa 源码
+      - name: Download tinyalsa source
         run: |
           set -e
           curl -L --retry 3 -o tinyalsa-1.2.0.tar.gz \
             https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz
+          
           mkdir -p tinyalsa
           tar -xf tinyalsa-1.2.0.tar.gz --strip-components=1 -C tinyalsa
+          echo "tinyalsa source is ready."
 
-      # 4. CMake 进行交叉编译
+      # 5. 使用全新的 CMake 进行交叉编译
       - name: CMake & Build
         run: |
           set -e
           cd tinyalsa
           mkdir -p build && cd build
-          cmake -DCMAKE_TOOLCHAIN_FILE=${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
+          
+          echo "Starting CMake build..."
+          cmake -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=${{ env.NDK_PATH }}/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-24 \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DTINYALSA_BUILD_EXAMPLES=ON \
             ..
-          make -j$(nproc)
+          
+          ninja -j$(nproc)
+          echo "Build completed successfully!"
 
-      # 5. 上传编译好的二进制文件
+      # 6. 上传产物
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
