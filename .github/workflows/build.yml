@@ -1,6 +1,8 @@
 name: build tinyalsa
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   build:
@@ -16,9 +18,11 @@ jobs:
           ndk-version: r25c
           local-cache: true
 
-      - name: Clone tinyalsa 1.2.0 from gitee mirror
+      - name: Download tinyalsa 1.2.0 source tarball
         run: |
-          git clone --depth=1 -b 1.2.0 https://gitee.com/mirrors_tinyalsa/tinyalsa.git
+          wget https://mirrors.tuna.tsinghua.edu.cn/github-release/tinyalsa/tinyalsa/LatestRelease/tinyalsa-1.2.0.tar.gz
+          tar -xf tinyalsa-1.2.0.tar.gz
+          mv tinyalsa-1.2.0 tinyalsa
 
       - name: CMake & Build static bin
         run: |
