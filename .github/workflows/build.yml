@@ -18,11 +18,16 @@ jobs:
           ndk-version: r25c
           local-cache: true
 
-      - name: Download tinyalsa 1.2.0 source tarball
+      - name: Download tinyalsa 1.2.0
         run: |
-          wget https://mirrors.tuna.tsinghua.edu.cn/github-release/tinyalsa/tinyalsa/LatestRelease/tinyalsa-1.2.0.tar.gz
+          set -e
+          wget --retry-connrefused --waitretry=3 --tries=3 \
+          https://mirror.ghproxy.com/https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz \
+          -O tinyalsa-1.2.0.tar.gz
+          ls -la
           tar -xf tinyalsa-1.2.0.tar.gz
           mv tinyalsa-1.2.0 tinyalsa
+          ls -la tinyalsa
 
       - name: CMake & Build static bin
         run: |
