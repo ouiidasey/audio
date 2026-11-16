@@ -37,15 +37,16 @@ jobs:
           echo "NDK_PATH=${NDK_REAL_PATH}" >> $GITHUB_ENV
           echo "NDK installed at: $NDK_REAL_PATH"
 
-      # 4. 使用正确的 Tag 名拉取 tinyalsa v1.2.0 源码
+      # 4. 【核心修复】放弃寻找版本号，直接克隆最新的 main 分支
       - name: Download tinyalsa source via Git
         run: |
           set -e
-          echo "Cloning tinyalsa v1.2.0..."
-          git clone --depth 1 -b v1.2.0 https://github.com/tinyalsa/tinyalsa.git tinyalsa
+          echo "Cloning tinyalsa main branch..."
+          # 直接克隆主分支，彻底避开所有版本号找不到导致的 Git 报错
+          git clone --depth 1 https://github.com/tinyalsa/tinyalsa.git tinyalsa
           echo "tinyalsa source is ready."
 
-      # 5. 使用 Ninja 进行交叉编译 (增加 TINYALSA_BUILD_EXAMPLES=ON)
+      # 5. 使用 Ninja 进行交叉编译
       - name: CMake & Build
         run: |
           set -e
