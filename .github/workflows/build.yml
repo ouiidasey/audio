@@ -16,9 +16,9 @@ jobs:
 
       # 2. 安装必要的编译工具
       - name: Install Build Tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake ninja-build
 
       # 3. 下载并配置 Android NDK r25c
       - name: Setup Android NDK r25c
@@ -35,46 +35,4 @@ jobs:
           # 获取绝对路径并写入全局环境变量
           export NDK_REAL_PATH=$(realpath ~/android-ndk-r25c)
           echo "NDK_PATH=${NDK_REAL_PATH}" >> $GITHUB_ENV
-          echo "NDK installed at: $NDK_REAL_PATH"
-
-      # 4. 克隆最新的 tinyalsa main 分支源码
-      - name: Download tinyalsa source via Git
-        run: |
-          set -e
-          echo "Cloning tinyalsa main branch..."
-          git clone --depth 1 https://github.com/tinyalsa/tinyalsa.git tinyalsa
-          echo "tinyalsa source is ready."
-
-      # 5. 使用 Ninja 进行交叉编译 (彻底规避编译警告致命化)
-      - name: CMake & Build
-        run: |
-          set -e
-          cd tinyalsa
-          mkdir -p build && cd build
-          
-          echo "Starting CMake build with NDK..."
-          
-          # 将编译类型修改为 RelWithDebInfo，并增加 -Wno-error 标志
-          cmake -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE=${{ env.NDK_PATH }}/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-24 \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DTINYALSA_BUILD_EXAMPLES=ON \
-            -DCMAKE_C_FLAGS="-Wno-error" \
-            ..
-          
-          ninja -j$(nproc)
-          echo "Build completed successfully!"
-
-      # 6. 打包并上传编译产物
-      - name: Upload binaries
-        uses: actions/upload-artifact@v4
-        with:
-          name: tinyalsa-arm64-api24-static
-          path: |
-            tinyalsa/build/tinymix
-            tinyalsa/build/tinyplay
-            tinyalsa/build/tinycap
-            tinyalsa/build/tinypcminfo
+          echo "NDK installed
