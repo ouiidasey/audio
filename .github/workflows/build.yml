@@ -10,29 +10,31 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # 1. 使用官方 v5，完美解决所有 Node.js 冲突，彻底消灭 128 错误
+      # 1. 使用官方 v5，彻底消灭 128 错误
       - name: Checkout
         uses: actions/checkout@v5
 
-      # 2. 使用官方最新版插件自动配置环境
+      # 2. 修正为正确的 v1 版本，自动下载 NDK
       - name: Setup NDK
         id: ndk
-        uses: nttld/setup-ndk@v2
+        uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25c
           local-cache: true
 
-      # 3. 下载 tinyalsa 源码
+      # 3. 下载并解压 tinyalsa 源码
       - name: Download tinyalsa
         run: |
+          set -e
           curl -L --retry 3 -o tinyalsa-1.2.0.tar.gz \
             https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz
           mkdir -p tinyalsa
           tar -xf tinyalsa-1.2.0.tar.gz --strip-components=1 -C tinyalsa
 
-      # 4. 交叉编译
+      # 4. CMake 交叉编译
       - name: CMake & Build
         run: |
+          set -e
           cd tinyalsa
           mkdir -p build && cd build
           cmake -DCMAKE_TOOLCHAIN_FILE=${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
