@@ -1,14 +1,25 @@
 name: build tinyalsa
+
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
+
 jobs:
   build:
     runs-on: ubuntu-22.04
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # 既然官方 checkout action 在 Node 24 下会报 exit code 4，
+      # 我们直接绕过它，用原生的 git 命令拉取代码！
+      - name: Git Clone (代替官方 checkout)
+        run: |
+          # 设置 Git 全局凭据（避免报错）
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          # 拉取主分支
+          git clone --branch main --depth 1 https://github.com/oulidasey/audio.git .
+          git submodule update --init --recursive
 
       - name: Setup NDK r25c
         id: ndk
@@ -17,18 +28,14 @@ jobs:
           ndk-version: r25c
           local-cache: true
 
-      - name: Download tinyalsa 1.2.0
+      - name: Download tinyalsa
         run: |
           set -e
-          wget --retry-connrefused --waitretry=3 --tries=3 \
-          https://mirror.ghproxy.com/https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz \
-          -O tinyalsa-1.2.0.tar.gz
-          ls -la
-          tar -xf tinyalsa-1.2.0.tar.gz
-          mv tinyalsa-1.2.0 tinyalsa
-          ls -la tinyalsa
+          wget --retry-connrefused --waitretry=3 --tries=3 https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz -O tinyalsa-1.2.0.tar.gz
+          mkdir -p tinyalsa
+          tar -xf tinyalsa-1.2.0.tar.gz --strip-components=1 -C tinyalsa
 
-      - name: CMake & Build static bin
+      - name: CMake & Build
         run: |
           cd tinyalsa
           mkdir -p build && cd build
