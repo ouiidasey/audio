@@ -1,35 +1,40 @@
-name: build tinyalsa
+name: Build tinyalsa
+
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
+
 jobs:
   build:
     runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
-      - name: Setup NDK r25c
+    steps:
+      # 1. 使用目前绝对最新的 v7，彻底完美兼容 Node 24
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # 2. 使用最新稳定版插件自动配置交叉编译环境
+      - name: Setup NDK
         id: ndk
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25c
           local-cache: true
 
-      - name: Download tinyalsa 1.2.0
+      # 3. 原生下载并解压 tinyalsa 源码
+      - name: Download tinyalsa
         run: |
           set -e
-          wget --retry-connrefused --waitretry=3 --tries=3 \
-          https://mirror.ghproxy.com/https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz \
-          -O tinyalsa-1.2.0.tar.gz
-          ls -la
-          tar -xf tinyalsa-1.2.0.tar.gz
-          mv tinyalsa-1.2.0 tinyalsa
-          ls -la tinyalsa
+          curl -L --retry 3 -o tinyalsa-1.2.0.tar.gz \
+            https://github.com/tinyalsa/tinyalsa/archive/refs/tags/1.2.0.tar.gz
+          mkdir -p tinyalsa
+          tar -xf tinyalsa-1.2.0.tar.gz --strip-components=1 -C tinyalsa
 
-      - name: CMake & Build static bin
+      # 4. CMake 进行交叉编译
+      - name: CMake & Build
         run: |
+          set -e
           cd tinyalsa
           mkdir -p build && cd build
           cmake -DCMAKE_TOOLCHAIN_FILE=${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
@@ -41,6 +46,7 @@ jobs:
             ..
           make -j$(nproc)
 
+      # 5. 上传编译好的二进制文件
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
