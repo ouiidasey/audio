@@ -1,42 +1,39 @@
 name: build tinyalsa
-on:
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout repo (包含tinyalsa源码)
-        uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: Setup NDK r25c
-        id: ndk
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r25c
-          local-cache: true
-
-      - name: CMake build
-        run: |
-          cd tinyalsa
-          mkdir -p build && cd build
-          cmake -DCMAKE_TOOLCHAIN_FILE=${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-24 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DTINYALSA_BUILD_EXAMPLES=ON \
-            ..
-          make -j$(nproc)
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tinyalsa-arm64-api24-static
-          path: |
-            tinyalsa/build/tinymix
-            tinyalsa/build/tinyplay
-            tinyalsa/build/tinycap
-            tinyalsa/build/tinypcminfo
+ on:
+   workflow_dispatch:
+ jobs:
+   build:
+     runs-on: ubuntu-22.04
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v4
+       - name: Setup NDK r25c
+         id: ndk
+         uses: nttld/setup-ndk@v1
+         with:
+           ndk-version: r25c
+           local-cache: true
+       - name: Clone tinyalsa 1.2.0 from gitee mirror
+         run: |
+           git clone --depth=1 -b 1.2.0 https://gitee.com/mirrors_tinyalsa/tinyalsa.git
+       - name: CMake & Build static bin
+         run: |
+           cd tinyalsa
+           mkdir -p build && cd build
+           cmake -DCMAKE_TOOLCHAIN_FILE=${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake \
+                 -DANDROID_ABI=arm64-v8a \
+                 -DANDROID_PLATFORM=android-24 \
+                 -DCMAKE_BUILD_TYPE=Release \
+                 -DBUILD_SHARED_LIBS=OFF \
+                 -DTINYALSA_BUILD_EXAMPLES=ON \
+                 ..
+           make -j$(nproc)
+       - name: Upload binaries
+         uses: actions/upload-artifact@v4
+         with:
+           name: tinyalsa-arm64-api24-static
+           path: |
+             tinyalsa/build/tinymix
+             tinyalsa/build/tinyplay
+             tinyalsa/build/tinycap
+             tinyalsa/build/tinypcminfo
