@@ -10,51 +10,47 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # 1. 拉取你本项目的代码
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 安装必要的编译工具
       - name: Install Build Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build
 
-      # 3. 下载并配置 Android NDK r25c
       - name: Setup Android NDK r25c
         run: |
           set -e
-          echo "Downloading NDK..."
           wget --retry-connrefused --waitretry=3 --tries=3 \
             https://dl.google.com/android/repository/android-ndk-r25c-linux.zip \
             -O /tmp/ndk-r25c.zip
-          
-          echo "Unzipping NDK..."
           unzip -q /tmp/ndk-r25c.zip -d ~/
-          
-          # 获取绝对路径并写入全局环境变量
           export NDK_REAL_PATH=$(realpath ~/android-ndk-r25c)
           echo "NDK_PATH=${NDK_REAL_PATH}" >> $GITHUB_ENV
-          echo "NDK installed at: $NDK_REAL_PATH"
 
-      # 4. 克隆最新的 tinyalsa main 分支源码
-      - name: Download tinyalsa source via Git
+      - name: Clone tinyalsa source
         run: |
           set -e
-          echo "Cloning tinyalsa main branch..."
           git clone --depth 1 https://github.com/tinyalsa/tinyalsa.git tinyalsa
-          echo "tinyalsa source is ready."
 
-      # 5. 智能路径修复源码警告并交叉编译
+      # ========== 【移到cmake前面】先打补丁，再构建 ==========
+      - name: Patch tinyhostless.c fix newline warning
+        run: |
+          set -e
+          cd tinyalsa
+          if [ -f "examples/tinyhostless.c" ]; then
+            echo "" >> examples/tinyhostless.c
+          elif [ -f "utils/tinyhostless.c" ]; then
+            echo "" >> utils/tinyhostless.c
+          else
+            echo "tinyhostless.c not found, skip patch"
+          fi
+
       - name: CMake & Build
         run: |
           set -e
           cd tinyalsa
           mkdir -p build && cd build
-          
-          echo "Starting CMake build with NDK..."
-          
-          # 使用全局静音参数，彻底无视警告
           cmake -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=${{ env.NDK_PATH }}/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
@@ -62,23 +58,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DBUILD_SHARED_LIBS=OFF \
             -DTINYALSA_BUILD_EXAMPLES=ON \
-            -DCMAKE_C_FLAGS="-w" \
             ..
-          
-          # 【终极修复】自动检测并修复 tinyhostless.c 末尾空行警告
-          echo "Patching tinyhostless.c to fix newline warning..."
-          if [ -f "examples/tinyhostless.c" ]; then
-            echo "" >> examples/tinyhostless.c
-          elif [ -f "utils/tinyhostless.c" ]; then
-            echo "" >> utils/tinyhostless.c
-          else
-            echo "Warning: tinyhostless.c not found, skipping patch."
-          fi
-          
           ninja -j$(nproc)
-          echo "Build completed successfully!"
 
-      # 6. 打包并上传编译产物
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
