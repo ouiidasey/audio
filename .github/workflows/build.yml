@@ -33,10 +33,10 @@ jobs:
           set -e
           git clone --depth 1 https://github.com/tinyalsa/tinyalsa.git tinyalsa
 
-      - name: Remove broken tinyhostless source
+      - name: Patch CMakeLists, comment tinyhostless
         run: |
           cd tinyalsa
-          rm -f utils/tinyhostless.c
+          sed -i '/add_executable(tinyhostless/,/)/ s/^/#/' CMakeLists.txt
 
       - name: CMake & Build
         run: |
