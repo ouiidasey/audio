@@ -36,7 +36,7 @@ jobs:
       - name: Patch CMakeLists, comment tinyhostless
         run: |
           cd tinyalsa
-          sed -i '/add_executable(tinyhostless/,/)/ s/^/#/' CMakeLists.txt
+          sed -i '/add_executable(tinyhostless/s/^/#/' CMakeLists.txt
 
       - name: CMake & Build
         run: |
