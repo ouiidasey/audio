@@ -33,6 +33,11 @@ jobs:
           set -e
           git clone --depth 1 https://github.com/tinyalsa/tinyalsa.git tinyalsa
 
+      - name: Remove broken tinyhostless source
+        run: |
+          cd tinyalsa
+          rm -f utils/tinyhostless.c
+
       - name: CMake & Build
         run: |
           set -e
@@ -44,7 +49,6 @@ jobs:
             -DANDROID_PLATFORM=android-24 \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_C_FLAGS="-Wno-newline-eof" \
             ..
           ninja -j$(nproc)
           STRIP=${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip
