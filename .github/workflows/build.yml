@@ -28,13 +28,12 @@ jobs:
           export NDK_REAL_PATH=$(realpath ~/android-ndk-r25c)
           echo "NDK_PATH=${NDK_REAL_PATH}" >> $GITHUB_ENV
 
-      - name: Clone tinyalsa source
+      - name: Clone tinyalsa official source
         run: |
           set -e
           git clone --depth 1 https://github.com/tinyalsa/tinyalsa.git tinyalsa
 
-      # ========== 【移到cmake前面】先打补丁，再构建 ==========
-      - name: Patch tinyhostless.c fix newline warning
+      - name: Patch newline warning
         run: |
           set -e
           cd tinyalsa
@@ -42,8 +41,6 @@ jobs:
             echo "" >> examples/tinyhostless.c
           elif [ -f "utils/tinyhostless.c" ]; then
             echo "" >> utils/tinyhostless.c
-          else
-            echo "tinyhostless.c not found, skip patch"
           fi
 
       - name: CMake & Build
@@ -60,11 +57,14 @@ jobs:
             -DTINYALSA_BUILD_EXAMPLES=ON \
             ..
           ninja -j$(nproc)
+          # strip 瘦身
+          ${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-strip \
+            tinycap tinymix tinyplay tinypcminfo
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
-          name: tinyalsa-arm64-api24-static
+          name: tinyalsa-official-arm64-api24-static
           path: |
             tinyalsa/build/tinymix
             tinyalsa/build/tinyplay
