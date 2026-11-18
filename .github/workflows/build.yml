@@ -44,10 +44,9 @@ jobs:
             -DANDROID_PLATFORM=android-24 \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DBUILD_SHARED_LIBS=OFF \
-            -DTINYALSA_BUILD_EXAMPLES=ON \
+            -DTINYALSA_BUILD_EXAMPLES=OFF \
             ..
           ninja -j$(nproc)
-          # 修复：NDK r25c 使用 llvm-strip
           STRIP=${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip
           $STRIP tinycap tinymix tinyplay tinypcminfo
 
