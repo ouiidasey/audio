@@ -33,16 +33,6 @@ jobs:
           set -e
           git clone --depth 1 https://github.com/tinyalsa/tinyalsa.git tinyalsa
 
-      - name: Patch newline warning
-        run: |
-          set -e
-          cd tinyalsa
-          if [ -f "examples/tinyhostless.c" ]; then
-            echo "" >> examples/tinyhostless.c
-          elif [ -f "utils/tinyhostless.c" ]; then
-            echo "" >> utils/tinyhostless.c
-          fi
-
       - name: CMake & Build
         run: |
           set -e
@@ -57,9 +47,9 @@ jobs:
             -DTINYALSA_BUILD_EXAMPLES=ON \
             ..
           ninja -j$(nproc)
-          # strip 瘦身
-          ${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-strip \
-            tinycap tinymix tinyplay tinypcminfo
+          # 修复：NDK r25c 使用 llvm-strip
+          STRIP=${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip
+          $STRIP tinycap tinymix tinyplay tinypcminfo
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
